@@ -1,29 +1,26 @@
 pipeline
 {
-  agent any
-
+  agent {
+  label 'server1'
+}
+tools {
+  maven 'mymaven' }
+  
   stages
   {
     stage('build')
     {
       steps{
-        echo "Building the application..."
+        sh 'mvn clean package'
+      }
+
+      post {
+        success {
+          archiveArtifacts artifacts: '**/target/*.war'
+        }
       }
     }
 
-    stage('test')
-    {
-      steps{
-        echo "Testing the application..."
-      }
-    }
-
-    stage('deploy')
-    {
-      steps{
-      echo "Deploying the application..." 
-      }
-    }
   }
 }
 
