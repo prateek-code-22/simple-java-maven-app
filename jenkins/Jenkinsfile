@@ -1,77 +1,111 @@
 pipeline
 {
-  agent {
-  label 'server1'
-}
-tools {
-  maven 'mymaven' }
-  
+
+  // agent is used to define where the pipeline will run
+  agent
+  {
+    label 'server1'
+  }
+
+// tools are used to define the tools that will be used in the pipeline
+  tools 
+  {
+    maven 'mymaven'
+  }
+
+// environment variables can be defined here and used in the pipeline
+  environment 
+  {
+    Name = 'Prateek'
+  }
+
+// parameters are used to define the parameters that will be used in the pipeline
+  // these parameters can be used to pass values to the pipeline at runtime
+  parameters {
+    choice choices: ['dev', 'prod'], name: 'environment'
+  }
+
   stages
   {
     stage('build')
     {
       steps{
         sh 'mvn clean package'
+        echo "Hello ${Name}"
       }
 
-      post {
-        success {
-          archiveArtifacts artifacts: '**/target/*.war'
-        }
-      }
     }
 
+    stage('test')
+    {
+      //example of parallel execution of stages 
+      parallel
+      {
+
+        stage('A')
+        {
+          steps{
+          echo "inside test A"
+          } 
+        }
+
+        stage('B')
+        {
+          agent {label: 'server2'} // run on server2
+          steps{
+          echo "inside test B"
+          }
+        }
+
+      }
+        // if build successful then proceed to archive the artifacts
+      post {
+        success {
+          archiveArtifacts artifacts: '**/target/*.war' //to save the war file as artifact on server
+
+          dir("webapp/target/"){
+          stash name: 'mywar', includes: '**/target/*.war' // to stash the war file for later use // it uses the jenkins workspace to save the file and can be transferred to other nodes
+        }
+        }
+      }
+
+    }
+
+    stage('deploy_dev'){
+      when { expression {param.environment == 'dev'}
+      beforeAgent true // this will run before the agent is allocated
+      agent {label: 'server2'} // run on server2
+      steps{
+          dir("webapp/target/"){
+            unstash 'mywar' // to unstash the war file from the stash
+      }
+      }
+    }
   }
+    stage('deploy_prod'){
+      when { expression {param.environment == 'prod'}
+      beforeAgent true // this will run before the agent is allocated
+      agent {label: 'server2'} // run on server2
+      steps{
+          timeout(time:5, unit:'DAYS'){
+            input message: 'Deployment approved'
+          
+          dir("webapp/target/"){
+            unstash 'mywar' // to unstash the war file from the stash
+      }
+          }
+      }
+    }
+  }
+
+  stage{
+    steps{
+      echo "printing from groovy script"
+      script{
+        file = load "script.groovy"
+        file.hello()
+      }
+    }
+  }
+  
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// pipeline
-// {
-
-// agent {
-//   label 'DevServer'
-// }
-
-// tools {
-//   maven 'mymaven'
-// }
-
-// stages{
-
-//     stage('build')
-//     {
-//         steps {
-//             sh 'mvn clean package'
-//         }
-
-//         post {
-//         success {
-//             archiveArtifacts artifacts: '**/target/*.war'
-//                  }
-//             }
-
-//     }
-
-   
-
-    
-// }
-
-// }
